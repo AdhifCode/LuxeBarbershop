@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-navy: #0a192f;
+  --color-charcoal: #121212;
+  --color-gold: #d4af37;
+  --color-gold-light: #e6c863;
+  --color-offwhite: #f5f5f5;
+  --color-lightgray: #e0e0e0;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-navy);
+  color: var(--color-offwhite);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Selection */
+::selection {
+  background-color: var(--color-gold);
+  color: var(--color-navy);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-navy);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-gold);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gold-light);
+}
+
+/* Headings get the display serif by default */
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-playfair), Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+@layer components {
+  /* Section padding utility */
+  .section-padding {
+    @apply py-20 px-6 md:py-28 md:px-12 lg:px-20;
+  }
+
+  /* Gold underline accent */
+  .gold-underline {
+    @apply relative inline-block;
+  }
+  .gold-underline::after {
+    content: "";
+    @apply absolute left-1/2 -bottom-3 h-[2px] w-16 -translate-x-1/2 bg-gold-gradient;
+  }
+
+  /* Glassy luxe card */
+  .luxe-card {
+    @apply relative overflow-hidden rounded-2xl border border-gold/15 bg-navy-50/40
+           backdrop-blur-sm transition-all duration-500;
+  }
+  .luxe-card:hover {
+    @apply border-gold/50 shadow-gold;
+    transform: translateY(-6px);
+  }
+
+  /* Gold shimmering text */
+  .gold-text {
+    background: linear-gradient(
+      90deg,
+      #d4af37 0%,
+      #f5e9b8 50%,
+      #d4af37 100%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 4s linear infinite;
+  }
+
+  /* Subtle grain overlay for premium feel */
+  .grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");
+    opacity: 0.04;
+    mix-blend-mode: overlay;
+  }
+}
