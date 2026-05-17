@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { Scissors } from "lucide-react";
 import { redirect } from "next/navigation";
-import { signInWithEmail } from "@/server/actions/auth";
 import { getSessionUser } from "@/lib/auth/guard";
-import Button from "@/components/ui/Button";
-import Input, { FieldLabel } from "@/components/ui/Input";
+import LoginForm from "./LoginForm";
+
+export const dynamic = "force-dynamic";
 
 export default async function LoginPage({
   searchParams,
@@ -17,14 +17,8 @@ export default async function LoginPage({
     redirect(params.next ?? "/admin");
   }
 
-  async function action(formData: FormData) {
-    "use server";
-    await signInWithEmail(formData);
-  }
-
   return (
     <div className="min-h-screen w-full bg-navy">
-      {/* Decorative background */}
       <div className="pointer-events-none fixed -right-32 top-1/4 h-[400px] w-[400px] rounded-full bg-gold/5 blur-[120px]" />
       <div className="pointer-events-none fixed -left-32 bottom-1/4 h-[400px] w-[400px] rounded-full bg-gold/5 blur-[140px]" />
 
@@ -59,40 +53,13 @@ export default async function LoginPage({
               Akun Anda tidak memiliki akses ke admin panel.
             </div>
           )}
-
-          <form action={action} className="space-y-4">
-            <input type="hidden" name="next" value={params.next ?? ""} />
-            <div>
-              <FieldLabel htmlFor="email" required>
-                Email
-              </FieldLabel>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                required
-                autoComplete="email"
-                placeholder="admin@luxebarbershop.id"
-              />
+          {params.error === "callback" && (
+            <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-300">
+              Sesi gagal dimuat. Silakan login ulang.
             </div>
-            <div>
-              <FieldLabel htmlFor="password" required>
-                Password
-              </FieldLabel>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                required
-                autoComplete="current-password"
-                placeholder="••••••••"
-              />
-            </div>
+          )}
 
-            <Button type="submit" size="lg" className="w-full">
-              Sign In
-            </Button>
-          </form>
+          <LoginForm next={params.next ?? "/admin"} />
         </div>
 
         <p className="mt-6 text-center text-xs text-mutedgray">

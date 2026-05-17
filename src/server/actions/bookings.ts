@@ -129,7 +129,7 @@ export async function createBooking(
 
   // 6. Atomically increment promo used_count (after successful booking)
   if (promoId) {
-    await (admin as any).rpc("increment_promo_used_count", { p_id: promoId });
+    await admin.rpc("increment_promo_used_count", { p_id: promoId });
   }
 
   // 7. Persist notification record & build WA URL

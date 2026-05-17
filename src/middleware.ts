@@ -8,10 +8,13 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all paths except:
-     * - _next static, image optimization
-     * - public assets (svg/png/jpg/etc.)
+     * Run the auth/session middleware on everything EXCEPT:
+     * - /api/*           (public + protected APIs handle their own auth)
+     * - /_next/static    (build assets)
+     * - /_next/image     (image optimizer)
+     * - /favicon.ico
+     * - any image / font request by extension
      */
-    "/((?!_next/static|_next/image|favicon.ico|images|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?)$).*)",
+    "/((?!api/|_next/static|_next/image|favicon.ico|images|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)",
   ],
 };
