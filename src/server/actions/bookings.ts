@@ -27,7 +27,6 @@ export async function createBooking(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid" };
   }
 
-  // Use service-role to: read service, validate promo, atomically insert.
   const admin = createSupabaseAdminClient();
 
   // 1. Snapshot service
@@ -58,19 +57,30 @@ export async function createBooking(
   const start = new Date(parsed.data.start_at);
   const end = new Date(start.getTime() + service.duration_min * 60 * 1000);
 
-  // 4. Apply promo (optional)
+  // 4. Validate & apply promo (optional)
   let promoId: string | null = null;
   let discount = 0;
+
   if (parsed.data.promo_code) {
+    const now = new Date().toISOString();
     const { data: promo } = await admin
       .from("promos")
       .select("*")
       .eq("code", parsed.data.promo_code.toUpperCase())
       .eq("is_active", true)
-      .lte("starts_at", new Date().toISOString())
-      .gte("ends_at", new Date().toISOString())
+      .lte("starts_at", now)
+      .gte("ends_at", now)
       .maybeSingle();
+
     if (promo) {
+      // Check usage limit — prevent over-redemption
+      if (
+        promo.usage_limit !== null &&
+        promo.used_count >= promo.usage_limit
+      ) {
+        return { ok: false, error: "Kode promo sudah mencapai batas penggunaan." };
+      }
+
       promoId = promo.id;
       discount =
         promo.type === "PERCENTAGE"
@@ -78,9 +88,10 @@ export async function createBooking(
           : Math.min(promo.value, service.price);
     }
   }
+
   const totalPrice = Math.max(0, service.price - discount);
 
-  // 5. Insert. The DB exclusion constraint guarantees no double-booking.
+  // 5. Insert booking — DB exclusion constraint guards against double-booking
   const { data: created, error: insErr } = await admin
     .from("bookings")
     .insert({
@@ -101,18 +112,31 @@ export async function createBooking(
       total_price: totalPrice,
       notes: parsed.data.notes || null,
     })
-    .select("id, code, customer_name, customer_phone, service_title, barber_name, start_at, total_price, status")
+    .select(
+      "id, code, customer_name, customer_phone, service_title, barber_name, start_at, total_price, status"
+    )
     .single();
 
   if (insErr) {
     if (insErr.message.includes("no_double_booking")) {
-      return { ok: false, error: "Slot ini sudah dipesan. Silakan pilih jam lain." };
+      return {
+        ok: false,
+        error: "Slot ini sudah dipesan. Silakan pilih jam lain.",
+      };
     }
     return { ok: false, error: insErr.message };
   }
 
-  // 6. Persist & build WA notification
-  const message = buildBookingMessage(created as unknown as BookingRow, "PENDING");
+  // 6. Atomically increment promo used_count (after successful booking)
+  if (promoId) {
+    await admin.rpc("increment_promo_used_count", { p_id: promoId });
+  }
+
+  // 7. Persist notification record & build WA URL
+  const message = buildBookingMessage(
+    created as unknown as BookingRow,
+    "PENDING"
+  );
   await admin.from("notifications").insert({
     booking_id: created.id,
     channel: "WHATSAPP",
@@ -120,10 +144,10 @@ export async function createBooking(
     body: message,
   });
 
-  const phone = created.customer_phone.replace(/[^0-9]/g, "").replace(/^0/, "62");
-  const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(
-    message
-  )}`;
+  const phone = created.customer_phone
+    .replace(/[^0-9]/g, "")
+    .replace(/^0/, "62");
+  const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 
   revalidatePath("/admin/bookings");
   return {
@@ -157,7 +181,7 @@ export async function listBookings(opts?: {
 }
 
 // ──────────────────────────────────────────────
-// ADMIN · status transition (approve/cancel/etc)
+// ADMIN · status transition
 // ──────────────────────────────────────────────
 export async function updateBookingStatus(
   input: UpdateBookingStatusInput
@@ -177,9 +201,11 @@ export async function updateBookingStatus(
       "id, code, customer_name, customer_phone, service_title, barber_name, start_at, total_price, status"
     )
     .single();
-  if (error || !updated) return { ok: false, error: error?.message ?? "Not found" };
 
-  // Log notification (admin opens WA URL to actually send — keeps things lightweight)
+  if (error || !updated) {
+    return { ok: false, error: error?.message ?? "Not found" };
+  }
+
   const message = buildBookingMessage(
     updated as unknown as BookingRow,
     parsed.data.status
@@ -191,7 +217,9 @@ export async function updateBookingStatus(
     body: message,
   });
 
-  const phone = updated.customer_phone.replace(/[^0-9]/g, "").replace(/^0/, "62");
+  const phone = updated.customer_phone
+    .replace(/[^0-9]/g, "")
+    .replace(/^0/, "62");
   const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 
   revalidatePath("/admin/bookings");
@@ -228,13 +256,16 @@ export async function rescheduleBooking(
       start_at: start.toISOString(),
       end_at: end.toISOString(),
       barber_id: parsed.data.barber_id ?? null,
-      status: "PENDING", // re-confirm needed
+      status: "PENDING",
     })
     .eq("id", parsed.data.id);
 
   if (error) {
     if (error.message.includes("no_double_booking")) {
-      return { ok: false, error: "Slot tujuan bentrok dengan booking lain." };
+      return {
+        ok: false,
+        error: "Slot tujuan bentrok dengan booking lain.",
+      };
     }
     return { ok: false, error: error.message };
   }
