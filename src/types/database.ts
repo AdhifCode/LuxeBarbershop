@@ -364,6 +364,11 @@ export type Database = {
         Args: Record<string, never>;
         Returns: boolean;
       };
+      // ← tambahkan ini
+      increment_promo_used_count: {
+        Args: { p_id: string };
+        Returns: undefined;
+      };
     };
     Enums: {
       user_role: UserRole;
